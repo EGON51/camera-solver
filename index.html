@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>문제 풀어줘</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+    }
+    h1 { font-size: 22px; margin-bottom: 24px; color: #1a1a1a; }
+
+    .btn-camera {
+      width: 100%;
+      max-width: 400px;
+      padding: 18px;
+      font-size: 18px;
+      background: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      margin-bottom: 16px;
+    }
+
+    #preview {
+      width: 100%;
+      max-width: 400px;
+      border-radius: 14px;
+      display: none;
+      margin-bottom: 16px;
+    }
+
+    .btn-solve {
+      width: 100%;
+      max-width: 400px;
+      padding: 16px;
+      font-size: 17px;
+      background: #10b981;
+      color: white;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      display: none;
+      margin-bottom: 20px;
+    }
+    .btn-solve:disabled { background: #9ca3af; }
+
+    #loading { display: none; font-size: 16px; color: #6b7280; margin-bottom: 16px; }
+
+    #result {
+      width: 100%;
+      max-width: 400px;
+      background: white;
+      border-radius: 14px;
+      padding: 18px;
+      font-size: 15px;
+      line-height: 1.7;
+      color: #1a1a1a;
+      display: none;
+      white-space: pre-wrap;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    input[type="file"] { display: none; }
+  </style>
+</head>
+<body>
+  <h1>📷 문제 풀어줘</h1>
+
+  <input type="file" id="fileInput" accept="image/*" capture="environment">
+  <button class="btn-camera" onclick="document.getElementById('fileInput').click()">
+    📸 사진 찍기
+  </button>
+
+  <img id="preview" alt="미리보기">
+
+  <button class="btn-solve" id="solveBtn" onclick="solve()">
+    ✨ AI에게 풀어달라기
+  </button>
+
+  <div id="loading">⏳ AI가 문제를 풀고 있어요...</div>
+  <div id="result"></div>
+
+  <script>
+    const API_KEY = "여기에_API_키_입력"; // ← API 키 여기에
+
+    let imageBase64 = "";
+
+    document.getElementById("fileInput").addEventListener("change", function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        imageBase64 = ev.target.result;
+        const preview = document.getElementById("preview");
+        preview.src = imageBase64;
+        preview.style.display = "block";
+        document.getElementById("solveBtn").style.display = "block";
+        document.getElementById("result").style.display = "none";
+      };
+      reader.readAsDataURL(file);
+    });
+
+    async function solve() {
+      if (!imageBase64) return;
+      const btn = document.getElementById("solveBtn");
+      btn.disabled = true;
+      document.getElementById("loading").style.display = "block";
+      document.getElementById("result").style.display = "none";
+
+      const base64Data = imageBase64.split(",")[1];
+
+      try {
+        const res = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": API_KEY,
+            "anthropic-version": "2023-06-01",
+            "anthropic-dangerous-direct-browser-access": "true"
+          },
+          body: JSON.stringify({
+            model: "claude-opus-4-7",
+            max_tokens: 1024,
+            messages: [{
+              role: "user",
+              content: [
+                {
+                  type: "image",
+                  source: { type: "base64", media_type: "image/jpeg", data: base64Data }
+                },
+                {
+                  type: "text",
+                  text: "이 이미지에 있는 문제를 읽고 풀어줘. 문제를 먼저 정확히 읽은 다음, 단계별로 풀이 과정을 설명하고 최종 답을 알려줘. 한국어로 답해줘."
+                }
+              ]
+            }]
+          })
+        });
+
+        const data = await res.json();
+        const resultEl = document.getElementById("result");
+        resultEl.textContent = data.content[0].text;
+        resultEl.style.display = "block";
+      } catch (err) {
+        alert("오류 발생: " + err.message);
+      } finally {
+        btn.disabled = false;
+        document.getElementById("loading").style.display = "none";
+      }
+    }
+  </script>
+</body>
+</html>
